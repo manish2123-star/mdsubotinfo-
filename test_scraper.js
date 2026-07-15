@@ -177,7 +177,7 @@ async function run() {
     const testNotif = notifications[3]; // Skip helper pins
     console.log(`English Title: ${testNotif.title}`);
     const hindiTitle = await translateToHindi(testNotif.title);
-    const sampleMsg = buildMsg(hindiTitle, `🔗 *Download Link:* ${testNotif.url}`);
+    const sampleMsg = buildMsg(hindiTitle, "https://mdsuplus.com/sample-post-slug/", testNotif.url);
     console.log(sampleMsg);
   }
 
@@ -187,14 +187,33 @@ async function run() {
   if (resultCourse) {
     console.log(`English Course: ${resultCourse.name}`);
     const hindiCourse = await translateToHindi(resultCourse.name);
-    const sampleResultMsg = buildMsg(`एमडीएसयू ${hindiCourse} का रिजल्ट जारी कर दिया गया है।`);
+    const sampleResultMsg = buildMsg(`एमडीएसयू ${hindiCourse} का रिजल्ट जारी कर दिया गया है।`, "https://mdsuplus.com/sample-result-slug/", "https://mdsuexam.org/");
     console.log(sampleResultMsg);
   }
   console.log("--------------------------------------------------");
 }
 
-function buildMsg(statusText, extra = "") {
-  return `*MDSU Latest Update*\n\n${statusText}\n\n👇👇👇👇👇👇👇👇\n\n${extra ? extra + '\n\n' : ''}👉सबसे पहले लेटेस्ट अपडेट पाने के लिए हमारे व्हाट्सएप एवं टेलीग्राम चैनल को जरूर फॉलो करें 👈\n\n*👇👇👇Join Now👇👇👇*\n\n*Join Whatsapp Channel*\n\nhttps://whatsapp.com/channel/0029Vb87pC44Y9liEfVCsK1Q\n\n*Join Telegram Channel*\n\nhttps://t.me/mdsuplus1`;
+function buildMsg(statusText, wpLink, directLink) {
+  return `*MDSU Latest Update*
+
+${statusText}
+
+👇👇👇👇👇👇👇👇
+
+🔗 *Read Update:* ${wpLink}
+📥 *Direct Link:* ${directLink}
+
+👉सबसे पहले लेटेस्ट अपडेट पाने के लिए हमारे व्हाट्सएप एवं टेलीग्राम चैनल को जरूर फॉलो करें 👈
+
+*👇👇👇Join Now👇👇👇*
+
+*Join Whatsapp Channel*
+
+https://whatsapp.com/channel/0029Vb87pC44Y9liEfVCsK1Q
+
+*Join Telegram Channel*
+
+https://t.me/mdsuplus1`;
 }
 
 run().catch(err => console.error("❌ Test failed:", err));

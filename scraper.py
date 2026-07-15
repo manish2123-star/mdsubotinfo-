@@ -327,18 +327,23 @@ def build_telegram_message(title, category, url=None):
     
     if category == "result":
         status_text = f"एमडीएसयू {title_hindi} का रिजल्ट जारी कर दिया गया है।"
+        direct_url = "https://mdsuexam.org/"
     elif category == "admit_card":
         status_text = f"एमडीएसयू {title_hindi} का एडमिट कार्ड जारी कर दिया गया है।"
+        direct_url = "https://mdsuexam.org/"
     elif category == "time_table":
         status_text = f"एमडीएसयू {title_hindi} का टाइम टेबल जारी कर दिया गया है।"
+        direct_url = url if url else "https://mdsuexam.org/"
     else:
         status_text = f"एमडीएसयू: {title_hindi}"
+        direct_url = url if url else "https://mdsuexam.org/"
 
     message = (
         "*MDSU Latest Update*\n\n"
         f"{status_text}\n\n"
         "👇👇👇👇👇👇👇👇\n\n"
-        f"🔗 *Read Update:* {wp_link}\n\n"
+        f"🔗 *Read Update:* {wp_link}\n"
+        f"📥 *Direct Link:* {direct_url}\n\n"
         "👉सबसे पहले लेटेस्ट अपडेट पाने के लिए हमारे व्हाट्सएप एवं टेलीग्राम चैनल को जरूर फॉलो करें 👈\n\n"
         "*👇👇👇Join Now👇👇👇*\n\n"
         "*Join Whatsapp Channel*\n\n"

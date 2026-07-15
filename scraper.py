@@ -12,6 +12,11 @@ TARGET_PANEL_URL = "https://mdsuexam.org/MdSmaINpanel.php"
 TARGET_FORMACTION_URL = "https://mdsuexam.org/FormActIon.php"
 TARGET_STUDENT_URL = "https://mdsuexam.org/StudentmaINpanel.php"
 BASE_URL = "https://mdsuexam.org/"
+
+# WordPress site configuration
+WP_API_POSTS = "https://mdsuplus.com/wp-json/wp/v2/posts?orderby=modified&order=desc&per_page=15"
+WP_API_PAGES = "https://mdsuplus.com/wp-json/wp/v2/pages?orderby=modified&order=desc&per_page=15"
+
 STATE_FILE_PATH = os.getenv("STATE_FILE", "data/state.json")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
@@ -20,10 +25,7 @@ def translate_to_hindi(text):
     """Translates the given English text to Hindi using the free Google Translate API."""
     if not text:
         return ""
-    
-    # Clean up input text
     text = " ".join(text.split())
-    
     try:
         url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=hi&dt=t&q={quote(text)}"
         response = requests.get(url, timeout=12)
@@ -33,7 +35,7 @@ def translate_to_hindi(text):
         return translated_text
     except Exception as e:
         print(f"Translation failed for '{text}': {e}", file=sys.stderr)
-        return text # fallback to english if translation fails
+        return text
 
 def send_telegram_notification(message):
     """Sends a markdown-formatted message to the specified Telegram chat/group."""
@@ -62,7 +64,7 @@ def load_state():
     """Loads the previous run state from state.json."""
     if not os.path.exists(STATE_FILE_PATH):
         os.makedirs(os.path.dirname(STATE_FILE_PATH), exist_ok=True)
-        return {"seen_pdfs": [], "course_states": {}, "last_check_timestamp": ""}
+        return {"seen_pdfs": [], "course_states": {}, "wp_states": {}, "last_check_timestamp": ""}
     
     try:
         with open(STATE_FILE_PATH, "r", encoding="utf-8") as f:
@@ -71,10 +73,12 @@ def load_state():
                 state["seen_pdfs"] = []
             if "course_states" not in state:
                 state["course_states"] = {}
+            if "wp_states" not in state:
+                state["wp_states"] = {}
             return state
     except Exception as e:
         print(f"Warning: Could not read state file, starting fresh. Error: {e}", file=sys.stderr)
-        return {"seen_pdfs": [], "course_states": {}, "last_check_timestamp": ""}
+        return {"seen_pdfs": [], "course_states": {}, "wp_states": {}, "last_check_timestamp": ""}
 
 def save_state(state):
     """Saves the current state back to state.json."""
@@ -152,7 +156,6 @@ def fetch_panel_pages():
             if name:
                 post_data3[name] = val
     else:
-        # Fallback regex extraction of inputs
         for tag in soup3.find_all("input"):
             name = tag.get("name")
             val = tag.get("value", "")
@@ -203,7 +206,6 @@ def parse_student_courses(html_student):
     soup = BeautifulSoup(html_student, "html.parser")
     courses = {}
 
-    # Find the main exam status table. It contains rows with bgcolor #BBD9F7 or #D9EAFB
     rows = soup.find_all("tr", {"bgcolor": ["#BBD9F7", "#D9EAFB"]})
     print(f"Found {len(rows)} course rows in Student Panel.")
 
@@ -212,7 +214,6 @@ def parse_student_courses(html_student):
         if len(cols) < 5:
             continue
 
-        # Column 1: Course Name (e.g. "SMAT4: M.Sc. MATHEMATICS...")
         raw_name = cols[0].get_text(strip=True)
         if ":" in raw_name:
             code, name = raw_name.split(":", 1)
@@ -222,18 +223,14 @@ def parse_student_courses(html_student):
             code = raw_name
             name = raw_name
 
-        # Clean course name (remove any trailing "(REVISED)", etc.)
         name = name.replace("(REVISED)", "").strip()
 
-        # Column 2: Time Table Link
         time_table_a = cols[1].find("a", href=True)
         time_table_link = time_table_a["href"].strip() if time_table_a else ""
 
-        # Column 3: Admit Card Link
         admit_card_a = cols[2].find("a")
         has_admit_card = True if (admit_card_a and "Admit Card" in admit_card_a.get_text()) else False
 
-        # Column 5: Result Link
         result_a = cols[4].find("a")
         has_result = True if (result_a and "Result" in result_a.get_text()) else False
 
@@ -245,6 +242,50 @@ def parse_student_courses(html_student):
         }
 
     return courses
+
+def fetch_wordpress_updates():
+    """Fetches the latest modified posts and pages from mdsuplus.com WordPress REST API."""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    
+    wp_items = []
+    
+    # 1. Fetch posts
+    try:
+        print("Fetching posts from mdsuplus.com API...")
+        r_posts = requests.get(WP_API_POSTS, headers=headers, timeout=15)
+        r_posts.raise_for_status()
+        posts = r_posts.json()
+        for item in posts:
+            wp_items.append({
+                "id": str(item.get("id")),
+                "title": item.get("title", {}).get("rendered", ""),
+                "link": item.get("link", ""),
+                "modified": item.get("modified", ""),
+                "type": "post"
+            })
+    except Exception as e:
+        print(f"Error fetching WordPress posts: {e}", file=sys.stderr)
+
+    # 2. Fetch pages
+    try:
+        print("Fetching pages from mdsuplus.com API...")
+        r_pages = requests.get(WP_API_PAGES, headers=headers, timeout=15)
+        r_pages.raise_for_status()
+        pages = r_pages.json()
+        for item in pages:
+            wp_items.append({
+                "id": str(item.get("id")),
+                "title": item.get("title", {}).get("rendered", ""),
+                "link": item.get("link", ""),
+                "modified": item.get("modified", ""),
+                "type": "page"
+            })
+    except Exception as e:
+        print(f"Error fetching WordPress pages: {e}", file=sys.stderr)
+
+    return wp_items
 
 def build_telegram_message(title, category, url=None):
     """Builds a formatted message exactly in the user's template."""
@@ -277,24 +318,48 @@ def build_telegram_message(title, category, url=None):
     )
     return message
 
+def build_wordpress_message(item):
+    """Formats a message for new/updated pages on mdsuplus.com using the user's exact styling."""
+    title = item["title"]
+    # Decode HTML entities if any in title (like &#8211; or \u090f)
+    title = BeautifulSoup(title, "html.parser").get_text(strip=True)
+
+    message = (
+        "*MDSU Latest Update*\n\n"
+        f"{title}\n\n"
+        "👇👇👇👇👇👇👇👇\n\n"
+        f"🔗 *Read Update:* {item['link']}\n\n"
+        "👉सबसे पहले लेटेस्ट अपडेट पाने के लिए हमारे व्हाट्सएप एवं टेलीग्राम चैनल को जरूर फॉलो करें 👈\n\n"
+        "*👇👇👇Join Now👇👇👇*\n\n"
+        "*Join Whatsapp Channel*\n\n"
+        "https://whatsapp.com/channel/0029Vb87pC44Y9liEfVCsK1Q\n\n"
+        "*Join Telegram Channel*\n\n"
+        "https://t.me/mdsuplus1"
+    )
+    return message
+
 def main():
     state = load_state()
     seen_pdfs = set(state.get("seen_pdfs", []))
     old_courses = state.get("course_states", {})
+    old_wp = state.get("wp_states", {})
 
+    # Fetch all data
     try:
         html_mdsma, html_student = fetch_panel_pages()
         notifications = parse_notifications(html_mdsma)
         current_courses = parse_student_courses(html_student)
     except Exception as e:
-        print(f"Scraping failed: {e}", file=sys.stderr)
+        print(f"Scraping MDSU failed: {e}", file=sys.stderr)
         sys.exit(1)
+
+    wp_items = fetch_wordpress_updates()
 
     # -------------------------------------------------------------
     # Seeding Check (First Run Protection)
     # -------------------------------------------------------------
     is_first_run = False
-    if not state.get("seen_pdfs") and not old_courses:
+    if not state.get("seen_pdfs") and not old_courses and not old_wp:
         is_first_run = True
         print("First run detected. Seeding state lists...")
 
@@ -304,27 +369,42 @@ def main():
         if notif["id"] not in seen_pdfs:
             new_pdfs.append(notif)
 
-    # Process Course-specific Updates (Results, Admit cards, Time tables)
+    # Process Course-specific Updates
     new_alerts = []
     for code, curr in current_courses.items():
         old = old_courses.get(code)
-        
         if old:
-            # Check for newly declared result
             if curr["result"] and not old.get("result"):
                 new_alerts.append({"title": curr["name"], "category": "result"})
-            # Check for newly released admit card
             if curr["admit_card"] and not old.get("admit_card"):
                 new_alerts.append({"title": curr["name"], "category": "admit_card"})
-            # Check for updated time table
             if curr["time_table"] and curr["time_table"] != old.get("time_table"):
                 url = urljoin(BASE_URL, curr["time_table"])
                 new_alerts.append({"title": curr["name"], "category": "time_table", "url": url})
 
-    # Save current courses to state (always update state regardless of first run)
-    state["course_states"] = current_courses
+    # Process WordPress Updates
+    new_wp_alerts = []
+    current_wp_states = {}
+    
+    for item in wp_items:
+        item_id = item["id"]
+        modified = item["modified"]
+        current_wp_states[item_id] = modified
+        
+        old_modified = old_wp.get(item_id)
+        if old_modified:
+            # If the item has been modified since last check
+            if modified != old_modified:
+                new_wp_alerts.append(item)
+        elif not is_first_run:
+            # If it's a completely new post/page and not the first run
+            new_wp_alerts.append(item)
 
-    # If first run, save state and exit without sending messages
+    # Update states
+    state["course_states"] = current_courses
+    state["wp_states"] = current_wp_states
+
+    # If first run, save state and exit
     if is_first_run:
         state["seen_pdfs"] = [notif["id"] for notif in notifications]
         state["last_check_timestamp"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -332,9 +412,10 @@ def main():
         print("State seeded successfully. No notifications sent.")
         return
 
-    # Send alerts for new general notifications
     success_count = 0
-    new_pdfs.reverse() # Notify oldest new updates first
+
+    # 1. Send alerts for new general notifications
+    new_pdfs.reverse()
     for notif in new_pdfs:
         message = build_telegram_message(notif["title"], "general", notif["url"])
         print(f"Sending general notification: {notif['title']}")
@@ -344,7 +425,7 @@ def main():
         else:
             break
 
-    # Send alerts for new course updates (results/admit cards)
+    # 2. Send alerts for new course updates (results/admit cards)
     for alert in new_alerts:
         message = build_telegram_message(alert["title"], alert["category"], alert.get("url"))
         print(f"Sending course update ({alert['category']}): {alert['title']}")
@@ -353,8 +434,17 @@ def main():
         else:
             break
 
+    # 3. Send alerts for new WordPress posts/updates
+    for item in new_wp_alerts:
+        message = build_wordpress_message(item)
+        print(f"Sending WordPress update: {item['title']}")
+        if send_telegram_notification(message):
+            success_count += 1
+        else:
+            break
+
     # Save state
-    state["seen_pdfs"] = list(seen_pdfs)[-200:] # Keep last 200 PDFs
+    state["seen_pdfs"] = list(seen_pdfs)[-200:]
     state["last_check_timestamp"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
     save_state(state)
     print(f"Completed run. Successfully sent {success_count} notifications.")

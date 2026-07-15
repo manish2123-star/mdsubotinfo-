@@ -1,7 +1,9 @@
 {
   "last_seen_id": "",
-  "last_check_timestamp": "2026-07-15T18:25:04.010726+00:00",
-  "seen_pdfs": [],
+  "last_check_timestamp": "2026-07-15T18:29:00.055874+00:00",
+  "seen_pdfs": [
+    "test_notif_id_123"
+  ],
   "course_states": {},
   "wp_states": {
     "1276": "2026-07-15T11:02:19",

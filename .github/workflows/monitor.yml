@@ -32,18 +32,11 @@ jobs:
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-    - name: Set up Tor SOCKS5 Proxy
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y tor
-        sudo service tor start
-        sleep 5
-
     - name: Run Scraper Script
       env:
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        # TARGET_URL: "https://news.ycombinator.com/" # Optional: uncomment if you want to override URL
+        GOOGLE_SCRIPT_PROXY_URL: ${{ secrets.GOOGLE_SCRIPT_PROXY_URL }}
       run: python scraper.py
 
     - name: Commit and push changes

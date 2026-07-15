@@ -90,32 +90,98 @@ def save_state(state):
     except Exception as e:
         print(f"Error saving state file: {e}", file=sys.stderr)
 
+def fetch_working_proxy():
+    """Fetches a list of free HTTP proxies and returns the first one that successfully connects to the university portal."""
+    print("Fetching free proxy list...")
+    proxy_urls = [
+        "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt",
+        "https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=5000&country=all"
+    ]
+    
+    proxies_list = []
+    for url in proxy_urls:
+        try:
+            r = requests.get(url, timeout=10)
+            if r.status_code == 200:
+                proxies_list.extend(r.text.strip().split('\n'))
+        except Exception:
+            continue
+            
+    import random
+    proxies_list = list(set([p.strip() for p in proxies_list if p.strip()]))
+    random.shuffle(proxies_list)
+    
+    print(f"Loaded {len(proxies_list)} raw proxies. Testing for a working connection to bypass Cloudflare/firewall...")
+    
+    for proxy in proxies_list[:35]:
+        proxy_dict = {
+            "http": f"http://{proxy}",
+            "https": f"http://{proxy}"
+        }
+        try:
+            # We use a separate fresh session for testing proxy to prevent cookie issues
+            test_session = requests.Session()
+            test_session.headers.update({
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Referer": "https://mdsuexam.org/"
+            })
+            # Disable verification for testing proxy
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            test_res = test_session.get("https://mdsuexam.org/vcnt.php", proxies=proxy_dict, timeout=6, verify=False)
+            if test_res.status_code == 200 and "f1" in test_res.text:
+                print(f"Found working proxy: {proxy}")
+                return proxy_dict
+        except Exception:
+            continue
+            
+    print("Could not find any working free proxy.")
+    return None
+
 def fetch_panel_pages():
     """Performs the full POST redirection sequence to fetch MdSmaINpanel.php and StudentmaINpanel.php."""
-    session = requests.Session()
+    GOOGLE_SCRIPT_PROXY_URL = os.getenv("GOOGLE_SCRIPT_PROXY_URL")
     
-    # If Tor is running locally on port 9050 (e.g. in GitHub Actions runner), route university traffic through it
-    import socket
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        s.connect(("127.0.0.1", 9050))
-        s.close()
-        session.proxies = {
-            'http': 'socks5h://127.0.0.1:9050',
-            'https': 'socks5h://127.0.0.1:9050'
-        }
-        print("Using Tor SOCKS5 proxy for university requests.")
-    except Exception:
-        print("Tor proxy not detected. Connecting directly.")
+    if GOOGLE_SCRIPT_PROXY_URL:
+        print("Fetching MDSU panel pages through Google Apps Script Proxy...")
+        try:
+            r = requests.get(GOOGLE_SCRIPT_PROXY_URL, timeout=30)
+            r.raise_for_status()
+            data = r.json()
+            if data.get("success"):
+                return data["html_mdsma"], data["html_student"]
+            else:
+                print(f"Proxy returned error: {data.get('error')}. Falling back to direct connection...", file=sys.stderr)
+        except Exception as e:
+            print(f"Failed to fetch through Google Apps Script Proxy: {e}. Falling back to direct connection...", file=sys.stderr)
 
+    session = requests.Session()
     session.headers.update({
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Referer": "https://mdsuexam.org/"
     })
 
     print("Step 1: Fetching vcnt.php...")
-    r1 = session.get(TARGET_VCNT_URL, timeout=20)
-    r1.raise_for_status()
+    try:
+        r1 = session.get(TARGET_VCNT_URL, timeout=20)
+        r1.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        if e.response is not None and e.response.status_code == 403:
+            print("Direct access blocked (403). Attempting to use a free proxy...")
+            proxy = fetch_working_proxy()
+            if proxy:
+                session.proxies = proxy
+                # Disable verification since free proxies often fail SSL validation
+                session.verify = False
+                # Retry with proxy
+                r1 = session.get(TARGET_VCNT_URL, timeout=20)
+                r1.raise_for_status()
+            else:
+                raise e
+        else:
+            raise e
+
+
 
     # Parse inputs from vcnt.php
     soup1 = BeautifulSoup(r1.text, "html.parser")

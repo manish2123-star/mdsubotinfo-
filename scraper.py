@@ -494,6 +494,14 @@ def main():
         if notif["id"] not in seen_pdfs:
             new_pdfs.append(notif)
 
+    if os.getenv("TEST_SEND") == "true":
+        print("Test run requested via environment variable. Adding a test notification...")
+        new_pdfs.append({
+            "id": "test_notif_id_123",
+            "title": "vigypati no 230 dt 10-7-26 reg date extended for form filling of UG(NEP) sem 2,4 & 6 exam June, 2026",
+            "url": "https://mdsuexam.org/PDF/P105154.pdf"
+        })
+
     # Process Course-specific Updates
     new_alerts = []
     for code, curr in current_courses.items():
@@ -532,6 +540,8 @@ def main():
     # If first run, save state and exit
     if is_first_run:
         state["seen_pdfs"] = [notif["id"] for notif in notifications]
+        state["course_states"] = current_courses
+        state["wp_states"] = current_wp_states
         state["last_check_timestamp"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         save_state(state)
         print("State seeded successfully. No notifications sent.")

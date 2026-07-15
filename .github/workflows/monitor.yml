@@ -5,7 +5,11 @@ on:
     # Run every 10 minutes
     - cron: '*/10 * * * *'
   workflow_dispatch:
-    # Allow manual triggering of the workflow from the GitHub UI
+    inputs:
+      test_send:
+        description: 'Set to "true" to force send a test notification to Telegram'
+        required: false
+        default: 'false'
 
 permissions:
   contents: write  # Crucial to allow committing and pushing state.json back to repo
@@ -37,6 +41,7 @@ jobs:
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         GOOGLE_SCRIPT_PROXY_URL: ${{ secrets.GOOGLE_SCRIPT_PROXY_URL }}
+        TEST_SEND: ${{ github.event.inputs.test_send }}
       run: python scraper.py
 
     - name: Commit and push changes

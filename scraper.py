@@ -287,9 +287,43 @@ def fetch_wordpress_updates():
 
     return wp_items
 
+def find_matching_wp_link(query):
+    """Searches mdsuplus.com WordPress API to find a matching post/page URL for the given query."""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    
+    # Try searching posts
+    try:
+        url = f"https://mdsuplus.com/wp-json/wp/v2/posts?search={quote(query)}&per_page=1"
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        posts = response.json()
+        if posts and len(posts) > 0:
+            return posts[0].get("link")
+    except Exception as e:
+        print(f"WP post search failed for '{query}': {e}", file=sys.stderr)
+
+    # Try searching pages
+    try:
+        url = f"https://mdsuplus.com/wp-json/wp/v2/pages?search={quote(query)}&per_page=1"
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        pages = response.json()
+        if pages and len(pages) > 0:
+            return pages[0].get("link")
+    except Exception as e:
+        print(f"WP page search failed for '{query}': {e}", file=sys.stderr)
+
+    # Fallback default link if not found
+    return "https://mdsuplus.com/"
+
 def build_telegram_message(title, category, url=None):
     """Builds a formatted message exactly in the user's template."""
     title_hindi = translate_to_hindi(title)
+    
+    # Search for matching mdsuplus.com link instead of sending raw university URL
+    wp_link = find_matching_wp_link(title)
     
     if category == "result":
         status_text = f"एमडीएसयू {title_hindi} का रिजल्ट जारी कर दिया गया है।"
@@ -300,15 +334,11 @@ def build_telegram_message(title, category, url=None):
     else:
         status_text = f"एमडीएसयू: {title_hindi}"
 
-    link_text = ""
-    if url:
-        link_text = f"🔗 *Download Link:* {url}\n\n"
-
     message = (
         "*MDSU Latest Update*\n\n"
         f"{status_text}\n\n"
         "👇👇👇👇👇👇👇👇\n\n"
-        f"{link_text}"
+        f"🔗 *Read Update:* {wp_link}\n\n"
         "👉सबसे पहले लेटेस्ट अपडेट पाने के लिए हमारे व्हाट्सएप एवं टेलीग्राम चैनल को जरूर फॉलो करें 👈\n\n"
         "*👇👇👇Join Now👇👇👇*\n\n"
         "*Join Whatsapp Channel*\n\n"

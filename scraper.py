@@ -17,7 +17,16 @@ BASE_URL = "https://mdsuexam.org/"
 WP_API_POSTS = "https://mdsuplus.com/wp-json/wp/v2/posts?orderby=modified&order=desc&per_page=15"
 WP_API_PAGES = "https://mdsuplus.com/wp-json/wp/v2/pages?orderby=modified&order=desc&per_page=15"
 
-STATE_FILE_PATH = os.getenv("STATE_FILE", "data/state.json")
+# Load local .env file if it exists
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+if os.path.exists(env_path):
+    with open(env_path, "r", encoding="utf-8") as f:
+        for line in f:
+            if "=" in line and not line.startswith("#"):
+                k, v = line.strip().split("=", 1)
+                os.environ[k.strip()] = v.strip()
+
+STATE_FILE_PATH = os.getenv("STATE_FILE", os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "state.json"))
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
@@ -254,7 +263,7 @@ def fetch_panel_pages():
     # Clean up broken HTML developer markup where rows end with <tr> instead of </tr>
     import re
     html_student = re.sub(r'<tr>(\s*<tr)', r'</tr>\1', html_student)
-    html_student = re.sub(r'</td>\s*<tr>\s*<tr', r'</td></tr>\1', html_student)
+    html_student = re.sub(r'</td>\s*<tr>\s*<tr', r'</td></tr><tr', html_student)
 
     return html_mdsma, html_student
 

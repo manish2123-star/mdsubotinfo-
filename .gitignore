@@ -10,3 +10,5 @@ ENV/
 
 # Local tests/states
 data/state_test.json
+.env
+data/state.json

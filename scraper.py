@@ -93,6 +93,21 @@ def save_state(state):
 def fetch_panel_pages():
     """Performs the full POST redirection sequence to fetch MdSmaINpanel.php and StudentmaINpanel.php."""
     session = requests.Session()
+    
+    # If Tor is running locally on port 9050 (e.g. in GitHub Actions runner), route university traffic through it
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.connect(("127.0.0.1", 9050))
+        s.close()
+        session.proxies = {
+            'http': 'socks5h://127.0.0.1:9050',
+            'https': 'socks5h://127.0.0.1:9050'
+        }
+        print("Using Tor SOCKS5 proxy for university requests.")
+    except Exception:
+        print("Tor proxy not detected. Connecting directly.")
+
     session.headers.update({
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Referer": "https://mdsuexam.org/"

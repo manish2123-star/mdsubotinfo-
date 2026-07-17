@@ -7,11 +7,11 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin, quote
 
 # Configuration
-TARGET_VCNT_URL = "https://mdsuexam.org/vcnt.php"
-TARGET_PANEL_URL = "https://mdsuexam.org/MdSmaINpanel.php"
-TARGET_FORMACTION_URL = "https://mdsuexam.org/FormActIon.php"
-TARGET_STUDENT_URL = "https://mdsuexam.org/StudentmaINpanel.php"
-BASE_URL = "https://mdsuexam.org/"
+TARGET_VCNT_URL = "https://www.mdsuexam.org/vcnt.php"
+TARGET_PANEL_URL = "https://www.mdsuexam.org/MdSmaINpanel.php"
+TARGET_FORMACTION_URL = "https://www.mdsuexam.org/FormActIon.php"
+TARGET_STUDENT_URL = "https://www.mdsuexam.org/StudentmaINpanel.php"
+BASE_URL = "https://www.mdsuexam.org/"
 
 
 # Load local .env file if it exists
@@ -59,6 +59,8 @@ def send_telegram_notification(message):
     
     try:
         response = requests.post(url, json=payload, timeout=15)
+        if response.status_code != 200:
+            print(f"Telegram returned error: {response.status_code} - {response.text}", file=sys.stderr)
         response.raise_for_status()
         print("Telegram notification sent successfully.")
         return True
@@ -129,12 +131,12 @@ def fetch_working_proxy():
             test_session = requests.Session()
             test_session.headers.update({
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Referer": "https://mdsuexam.org/"
+                "Referer": "https://www.mdsuexam.org/"
             })
             # Disable verification for testing proxy
             import urllib3
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-            test_res = test_session.get("https://mdsuexam.org/vcnt.php", proxies=proxy_dict, timeout=6, verify=False)
+            test_res = test_session.get("https://www.mdsuexam.org/vcnt.php", proxies=proxy_dict, timeout=6, verify=False)
             if test_res.status_code == 200 and "f1" in test_res.text:
                 print(f"Found working proxy: {proxy}")
                 return proxy_dict
@@ -164,7 +166,7 @@ def fetch_panel_pages():
     session = requests.Session()
     session.headers.update({
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Referer": "https://mdsuexam.org/"
+        "Referer": "https://www.mdsuexam.org/"
     })
 
     print("Step 1: Fetching vcnt.php...")
@@ -371,16 +373,16 @@ def build_telegram_message(title, category, url=None):
     
     if category == "result":
         status_text = f"एमडीएसयू {title_hindi} का रिजल्ट जारी कर दिया गया है।"
-        direct_url = "https://mdsuexam.org/"
+        direct_url = "https://www.mdsuexam.org/"
     elif category == "admit_card":
         status_text = f"एमडीएसयू {title_hindi} का एडमिट कार्ड जारी कर दिया गया है।"
-        direct_url = "https://mdsuexam.org/"
+        direct_url = "https://www.mdsuexam.org/"
     elif category == "time_table":
         status_text = f"एमडीएसयू {title_hindi} का टाइम टेबल जारी कर दिया गया है।"
-        direct_url = url if url else "https://mdsuexam.org/"
+        direct_url = url if url else "https://www.mdsuexam.org/"
     else:
         status_text = f"एमडीएसयू: {title_hindi}"
-        direct_url = url if url else "https://mdsuexam.org/"
+        direct_url = url if url else "https://www.mdsuexam.org/"
 
     message = (
         "*MDSU Latest Update*\n\n"

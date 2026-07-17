@@ -1,7 +1,7 @@
-const BASE_URL = "https://mdsuexam.org/";
-const TARGET_VCNT_URL = "https://mdsuexam.org/vcnt.php";
-const TARGET_FORMACTION_URL = "https://mdsuexam.org/FormActIon.php";
-const TARGET_STUDENT_URL = "https://mdsuexam.org/StudentmaINpanel.php";
+const BASE_URL = "https://www.mdsuexam.org/";
+const TARGET_VCNT_URL = "https://www.mdsuexam.org/vcnt.php";
+const TARGET_FORMACTION_URL = "https://www.mdsuexam.org/FormActIon.php";
+const TARGET_STUDENT_URL = "https://www.mdsuexam.org/StudentmaINpanel.php";
 
 async function translateToHindi(text) {
   if (!text) return "";
@@ -20,7 +20,7 @@ async function run() {
   console.log("Step 1: Fetching vcnt.php...");
   const headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Referer": "https://mdsuexam.org/"
+    "Referer": "https://www.mdsuexam.org/"
   };
 
   const res1 = await fetch(TARGET_VCNT_URL, { headers });
@@ -187,7 +187,7 @@ async function run() {
   if (resultCourse) {
     console.log(`English Course: ${resultCourse.name}`);
     const hindiCourse = await translateToHindi(resultCourse.name);
-    const sampleResultMsg = buildMsg(`एमडीएसयू ${hindiCourse} का रिजल्ट जारी कर दिया गया है।`, "https://mdsuplus.com/sample-result-slug/", "https://mdsuexam.org/");
+    const sampleResultMsg = buildMsg(`एमडीएसयू ${hindiCourse} का रिजल्ट जारी कर दिया गया है।`, "https://mdsuplus.com/sample-result-slug/", "https://www.mdsuexam.org/");
     console.log(sampleResultMsg);
   }
   console.log("--------------------------------------------------");

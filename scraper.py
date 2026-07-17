@@ -13,9 +13,6 @@ TARGET_FORMACTION_URL = "https://mdsuexam.org/FormActIon.php"
 TARGET_STUDENT_URL = "https://mdsuexam.org/StudentmaINpanel.php"
 BASE_URL = "https://mdsuexam.org/"
 
-# WordPress site configuration
-WP_API_POSTS = "https://mdsuplus.com/wp-json/wp/v2/posts?orderby=modified&order=desc&per_page=15"
-WP_API_PAGES = "https://mdsuplus.com/wp-json/wp/v2/pages?orderby=modified&order=desc&per_page=15"
 
 # Load local .env file if it exists
 env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
@@ -333,49 +330,6 @@ def parse_student_courses(html_student):
 
     return courses
 
-def fetch_wordpress_updates():
-    """Fetches the latest modified posts and pages from mdsuplus.com WordPress REST API."""
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
-    
-    wp_items = []
-    
-    # 1. Fetch posts
-    try:
-        print("Fetching posts from mdsuplus.com API...")
-        r_posts = requests.get(WP_API_POSTS, headers=headers, timeout=15)
-        r_posts.raise_for_status()
-        posts = r_posts.json()
-        for item in posts:
-            wp_items.append({
-                "id": str(item.get("id")),
-                "title": item.get("title", {}).get("rendered", ""),
-                "link": item.get("link", ""),
-                "modified": item.get("modified", ""),
-                "type": "post"
-            })
-    except Exception as e:
-        print(f"Error fetching WordPress posts: {e}", file=sys.stderr)
-
-    # 2. Fetch pages
-    try:
-        print("Fetching pages from mdsuplus.com API...")
-        r_pages = requests.get(WP_API_PAGES, headers=headers, timeout=15)
-        r_pages.raise_for_status()
-        pages = r_pages.json()
-        for item in pages:
-            wp_items.append({
-                "id": str(item.get("id")),
-                "title": item.get("title", {}).get("rendered", ""),
-                "link": item.get("link", ""),
-                "modified": item.get("modified", ""),
-                "type": "page"
-            })
-    except Exception as e:
-        print(f"Error fetching WordPress pages: {e}", file=sys.stderr)
-
-    return wp_items
 
 def find_matching_wp_link(query):
     """Searches mdsuplus.com WordPress API to find a matching post/page URL for the given query."""
@@ -443,32 +397,11 @@ def build_telegram_message(title, category, url=None):
     )
     return message
 
-def build_wordpress_message(item):
-    """Formats a message for new/updated pages on mdsuplus.com using the user's exact styling."""
-    title = item["title"]
-    # Decode HTML entities if any in title (like &#8211; or \u090f)
-    title = BeautifulSoup(title, "html.parser").get_text(strip=True)
-
-    message = (
-        "*MDSU Latest Update*\n\n"
-        f"{title}\n\n"
-        "👇👇👇👇👇👇👇👇\n\n"
-        f"🔗 *Read Update:* {item['link']}\n\n"
-        "👉सबसे पहले लेटेस्ट अपडेट पाने के लिए हमारे व्हाट्सएप एवं टेलीग्राम चैनल को जरूर फॉलो करें 👈\n\n"
-        "*👇👇👇Join Now👇👇👇*\n\n"
-        "*Join Whatsapp Channel*\n\n"
-        "https://whatsapp.com/channel/0029Vb87pC44Y9liEfVCsK1Q\n\n"
-        "*Join Telegram Channel*\n\n"
-        "https://t.me/mdsuplus1"
-    )
-    return message
 
 def main():
     state = load_state()
     seen_pdfs = set(state.get("seen_pdfs", []))
     old_courses = state.get("course_states", {})
-    old_wp = state.get("wp_states", {})
-
     # Fetch all data
     try:
         html_mdsma, html_student = fetch_panel_pages()
@@ -478,13 +411,11 @@ def main():
         print(f"Scraping MDSU failed: {e}", file=sys.stderr)
         sys.exit(1)
 
-    wp_items = fetch_wordpress_updates()
-
     # -------------------------------------------------------------
     # Seeding Check (First Run Protection)
     # -------------------------------------------------------------
     is_first_run = False
-    if not state.get("seen_pdfs") and not old_courses and not old_wp:
+    if not state.get("seen_pdfs") and not old_courses:
         is_first_run = True
         print("First run detected. Seeding state lists...")
 
@@ -515,33 +446,13 @@ def main():
                 url = urljoin(BASE_URL, curr["time_table"])
                 new_alerts.append({"title": curr["name"], "category": "time_table", "url": url})
 
-    # Process WordPress Updates
-    new_wp_alerts = []
-    current_wp_states = {}
-    
-    for item in wp_items:
-        item_id = item["id"]
-        modified = item["modified"]
-        current_wp_states[item_id] = modified
-        
-        old_modified = old_wp.get(item_id)
-        if old_modified:
-            # If the item has been modified since last check
-            if modified != old_modified:
-                new_wp_alerts.append(item)
-        elif not is_first_run:
-            # If it's a completely new post/page and not the first run
-            new_wp_alerts.append(item)
-
     # Update states
     state["course_states"] = current_courses
-    state["wp_states"] = current_wp_states
 
     # If first run, save state and exit
     if is_first_run:
         state["seen_pdfs"] = [notif["id"] for notif in notifications]
         state["course_states"] = current_courses
-        state["wp_states"] = current_wp_states
         state["last_check_timestamp"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         save_state(state)
         print("State seeded successfully. No notifications sent.")
@@ -569,14 +480,6 @@ def main():
         else:
             break
 
-    # 3. Send alerts for new WordPress posts/updates
-    for item in new_wp_alerts:
-        message = build_wordpress_message(item)
-        print(f"Sending WordPress update: {item['title']}")
-        if send_telegram_notification(message):
-            success_count += 1
-        else:
-            break
 
     # Save state
     state["seen_pdfs"] = list(seen_pdfs)[-200:]

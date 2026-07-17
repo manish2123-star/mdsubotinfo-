@@ -372,16 +372,16 @@ def build_telegram_message(title, category, url=None):
     wp_link = find_matching_wp_link(title)
     
     if category == "result":
-        status_text = f"एमडीएसयू {title_hindi} का रिजल्ट जारी कर दिया गया है।"
+        status_text = f"एमडीएसयू {title_hindi} का रिजल्ट जारी कर दिया गया है।\n\n({title})"
         direct_url = "https://www.mdsuexam.org/"
     elif category == "admit_card":
-        status_text = f"एमडीएसयू {title_hindi} का एडमिट कार्ड जारी कर दिया गया है।"
+        status_text = f"एमडीएसयू {title_hindi} का एडमिट कार्ड जारी कर दिया गया है।\n\n({title})"
         direct_url = "https://www.mdsuexam.org/"
     elif category == "time_table":
-        status_text = f"एमडीएसयू {title_hindi} का टाइम टेबल जारी कर दिया गया है।"
+        status_text = f"एमडीएसयू {title_hindi} का टाइम टेबल जारी कर दिया गया है।\n\n({title})"
         direct_url = url if url else "https://www.mdsuexam.org/"
     else:
-        status_text = f"एमडीएसयू: {title_hindi}"
+        status_text = f"एमडीएसयू: {title_hindi}\n\n({title})"
         direct_url = url if url else "https://www.mdsuexam.org/"
 
     message = (

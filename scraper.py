@@ -421,13 +421,32 @@ def build_telegram_message(title, category, url=None):
 
 
 def is_current_update(title):
-    """Filters out old historical updates (from 2016 to 2025)."""
+    """
+    Filters out any notification dated before 23-07-2026 (July 23, 2026)
+    and old historical exam years (2016-2025).
+    Only notifications on or after July 23, 2026 are allowed.
+    """
     if not title:
         return False
     import re
+
+    # Match dates like 20.07.2026, 21-07-2026, 10-7-26, 06.07.2026, etc.
+    date_match = re.search(r'\b(\d{1,2})[.\/-](\d{1,2})[.\/-](20\d{2}|\d{2})\b', title)
+    if date_match:
+        day = int(date_match.group(1))
+        month = int(date_match.group(2))
+        year = int(date_match.group(3))
+        if year < 100:
+            year += 2000
+        
+        # Cutoff: July 23, 2026
+        if (year, month, day) < (2026, 7, 23):
+            return False
+
     # Matches old exam years like 2016-2025 in title
     if re.search(r'\b(201[0-9]|202[0-5])\b', title):
         return False
+
     return True
 
 def main():

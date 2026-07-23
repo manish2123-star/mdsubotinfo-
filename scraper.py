@@ -6,6 +6,12 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, quote
 
+# Force UTF-8 encoding for Windows standard output
+try:
+    sys.stdout.reconfigure(encoding='utf-8')
+except Exception:
+    pass
+
 # Configuration
 TARGET_VCNT_URL = "https://www.mdsuexam.org/vcnt.php"
 TARGET_PANEL_URL = "https://www.mdsuexam.org/MdSmaINpanel.php"
@@ -60,7 +66,10 @@ def send_telegram_notification(message):
     try:
         response = requests.post(url, json=payload, timeout=15)
         if response.status_code != 200:
-            print(f"Telegram returned error: {response.status_code} - {response.text}", file=sys.stderr)
+            print(f"Telegram Markdown error ({response.status_code}): {response.text}. Retrying plain text...", file=sys.stderr)
+            payload_plain = dict(payload)
+            payload_plain.pop("parse_mode", None)
+            response = requests.post(url, json=payload_plain, timeout=15)
         response.raise_for_status()
         print("Telegram notification sent successfully.")
         return True
@@ -364,6 +373,14 @@ def find_matching_wp_link(query):
     # Fallback default link if not found
     return "https://mdsuplus.com/"
 
+def escape_md(text):
+    """Escapes Markdown formatting characters in raw text."""
+    if not text:
+        return ""
+    for ch in ['_', '*', '[', ']', '`']:
+        text = text.replace(ch, f'\\{ch}')
+    return text
+
 def build_telegram_message(title, category, url=None):
     """Builds a formatted message exactly in the user's template."""
     title_hindi = translate_to_hindi(title)
@@ -371,17 +388,20 @@ def build_telegram_message(title, category, url=None):
     # Search for matching mdsuplus.com link instead of sending raw university URL
     wp_link = find_matching_wp_link(title)
     
+    safe_title_hindi = escape_md(title_hindi)
+    safe_title = escape_md(title)
+    
     if category == "result":
-        status_text = f"एमडीएसयू {title_hindi} का रिजल्ट जारी कर दिया गया है।\n\n({title})"
+        status_text = f"एमडीएसयू {safe_title_hindi} का रिजल्ट जारी कर दिया गया है।\n\n({safe_title})"
         direct_url = "https://www.mdsuexam.org/"
     elif category == "admit_card":
-        status_text = f"एमडीएसयू {title_hindi} का एडमिट कार्ड जारी कर दिया गया है।\n\n({title})"
+        status_text = f"एमडीएसयू {safe_title_hindi} का एडमिट कार्ड जारी कर दिया गया है।\n\n({safe_title})"
         direct_url = "https://www.mdsuexam.org/"
     elif category == "time_table":
-        status_text = f"एमडीएसयू {title_hindi} का टाइम टेबल जारी कर दिया गया है।\n\n({title})"
+        status_text = f"एमडीएसयू {safe_title_hindi} का टाइम टेबल जारी कर दिया गया है।\n\n({safe_title})"
         direct_url = url if url else "https://www.mdsuexam.org/"
     else:
-        status_text = f"एमडीएसयू: {title_hindi}\n\n({title})"
+        status_text = f"एमडीएसयू: {safe_title_hindi}\n\n({safe_title})"
         direct_url = url if url else "https://www.mdsuexam.org/"
 
     message = (
@@ -402,8 +422,10 @@ def build_telegram_message(title, category, url=None):
 
 def main():
     state = load_state()
-    seen_pdfs = set(state.get("seen_pdfs", []))
+    seen_pdfs_list = state.get("seen_pdfs", [])
+    seen_pdfs_set = set(seen_pdfs_list)
     old_courses = state.get("course_states", {})
+
     # Fetch all data
     try:
         html_mdsma, html_student = fetch_panel_pages()
@@ -424,7 +446,7 @@ def main():
     # Process General Notification PDFs
     new_pdfs = []
     for notif in notifications:
-        if notif["id"] not in seen_pdfs:
+        if notif["id"] not in seen_pdfs_set:
             new_pdfs.append(notif)
 
     if os.getenv("TEST_SEND") == "true":
@@ -477,7 +499,9 @@ def main():
         message = build_telegram_message(notif["title"], "general", notif["url"])
         print(f"Sending general notification: {notif['title']}")
         if send_telegram_notification(message):
-            seen_pdfs.add(notif["id"])
+            if notif["id"] not in seen_pdfs_set:
+                seen_pdfs_list.append(notif["id"])
+                seen_pdfs_set.add(notif["id"])
             success_count += 1
         else:
             break
@@ -491,9 +515,8 @@ def main():
         else:
             break
 
-
-    # Save state
-    state["seen_pdfs"] = list(seen_pdfs)[-200:]
+    # Save state preserving last 300 seen PDFs
+    state["seen_pdfs"] = seen_pdfs_list[-300:]
     state["last_check_timestamp"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
     save_state(state)
     print(f"Completed run. Successfully sent {success_count} notifications.")

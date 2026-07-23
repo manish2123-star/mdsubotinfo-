@@ -420,16 +420,23 @@ def build_telegram_message(title, category, url=None):
     return message
 
 
-def is_current_update(title):
+def is_static_helpline(notif_id, title):
+    """Returns True if the link is a static helpline/guide/RTI form rather than a news update."""
+    text = (str(notif_id) + " " + str(title)).lower()
+    keywords = ["help_line", "step_by_step", "rti_answerbook", "certifiedcopy", "process for fill", "helpline", "help line", "abcid"]
+    return any(kw in text for kw in keywords)
+
+def is_current_update(notif_id, title):
     """
-    Filters out any notification dated before 23-07-2026 (July 23, 2026)
-    and old historical exam years (2016-2025).
-    Only notifications on or after July 23, 2026 are allowed.
+    Filters out static helplines and any notification dated before 23-07-2026 (July 23, 2026).
+    Only new notifications published on or after July 23, 2026 are allowed.
     """
     if not title:
         return False
-    import re
+    if is_static_helpline(notif_id, title):
+        return False
 
+    import re
     # Match dates like 20.07.2026, 21-07-2026, 10-7-26, 06.07.2026, etc.
     date_match = re.search(r'\b(\d{1,2})[.\/-](\d{1,2})[.\/-](20\d{2}|\d{2})\b', title)
     if date_match:
@@ -516,8 +523,8 @@ def main():
     # 1. Send alerts for new general notifications
     new_pdfs.reverse()
     for notif in new_pdfs:
-        if not is_current_update(notif["title"]):
-            print(f"Skipping old year notification: {notif['title']}")
+        if not is_current_update(notif["id"], notif["title"]):
+            print(f"Skipping static/old notification: {notif['title']}")
             if notif["id"] not in seen_pdfs_set:
                 seen_pdfs_list.append(notif["id"])
                 seen_pdfs_set.add(notif["id"])
@@ -535,8 +542,8 @@ def main():
 
     # 2. Send alerts for new course updates (results/admit cards)
     for alert in new_alerts:
-        if not is_current_update(alert["title"]):
-            print(f"Skipping old year course update: {alert['title']}")
+        if not is_current_update("", alert["title"]):
+            print(f"Skipping static/old course update: {alert['title']}")
             continue
 
         message = build_telegram_message(alert["title"], alert["category"], alert.get("url"))

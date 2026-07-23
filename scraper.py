@@ -420,6 +420,16 @@ def build_telegram_message(title, category, url=None):
     return message
 
 
+def is_current_update(title):
+    """Filters out old historical updates (from 2016 to 2025)."""
+    if not title:
+        return False
+    import re
+    # Matches old exam years like 2016-2025 in title
+    if re.search(r'\b(201[0-9]|202[0-5])\b', title):
+        return False
+    return True
+
 def main():
     state = load_state()
     seen_pdfs_list = state.get("seen_pdfs", [])
@@ -487,6 +497,13 @@ def main():
     # 1. Send alerts for new general notifications
     new_pdfs.reverse()
     for notif in new_pdfs:
+        if not is_current_update(notif["title"]):
+            print(f"Skipping old year notification: {notif['title']}")
+            if notif["id"] not in seen_pdfs_set:
+                seen_pdfs_list.append(notif["id"])
+                seen_pdfs_set.add(notif["id"])
+            continue
+
         message = build_telegram_message(notif["title"], "general", notif["url"])
         print(f"Sending general notification: {notif['title']}")
         if send_telegram_notification(message):
@@ -499,6 +516,10 @@ def main():
 
     # 2. Send alerts for new course updates (results/admit cards)
     for alert in new_alerts:
+        if not is_current_update(alert["title"]):
+            print(f"Skipping old year course update: {alert['title']}")
+            continue
+
         message = build_telegram_message(alert["title"], alert["category"], alert.get("url"))
         print(f"Sending course update ({alert['category']}): {alert['title']}")
         if send_telegram_notification(message):

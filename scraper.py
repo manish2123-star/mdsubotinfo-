@@ -469,15 +469,6 @@ def main():
             if curr["time_table"] and curr["time_table"] != old.get("time_table"):
                 url = urljoin(BASE_URL, curr["time_table"])
                 new_alerts.append({"title": curr["name"], "category": "time_table", "url": url})
-        else:
-            # If it's a completely new course added to the board, notify its active status items
-            if curr["result"]:
-                new_alerts.append({"title": curr["name"], "category": "result"})
-            if curr["admit_card"]:
-                new_alerts.append({"title": curr["name"], "category": "admit_card"})
-            if curr["time_table"]:
-                url = urljoin(BASE_URL, curr["time_table"])
-                new_alerts.append({"title": curr["name"], "category": "time_table", "url": url})
 
     # Update states
     state["course_states"] = current_courses
